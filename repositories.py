@@ -129,3 +129,18 @@ class AnswerRepository:
             connection.close()
 
         return self.get_answer(user_id, question_id)
+
+
+    def update_answer(self, user_id: int, question_id: int, selected_option: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute("UPDATE answers SET selected_option = %s WHERE user_id = %s and question_id = %s", (selected_option, user_id, question_id))
+                connection.commit()
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return self.get_answer(user_id, question_id)

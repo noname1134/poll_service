@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerAlreadyExistsError, UserServiceUnavailableError
+from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerAlreadyExistsError, UserServiceUnavailableError, AnswerNotFoundError
 from schemas import QuestionCreate, QuestionUpdate, QuestionResponse, AnswerCreate, AnswerUpdate, AnswerResponse
 from services import QuestionService, AnswerService
 
@@ -52,5 +52,17 @@ def create_answer(question_id: int, answer: AnswerCreate):
         raise HTTPException(status_code=403, detail=str(exc))
     except AnswerAlreadyExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    except UserServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.patch("/{question_id}/answers/{user_id}",response_model=AnswerResponse)
+def update_answer(question_id: int, user_id: int, update: AnswerUpdate):
+    try:
+        return answer_service.update_answer(user_id, question_id, update)
+    except (QuestionNotFoundError, UserNotFoundError, AnswerNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UserNotRegisteredError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
     except UserServiceUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
