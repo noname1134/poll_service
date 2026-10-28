@@ -48,6 +48,15 @@ def delete_question(question_id: int):
     return {"message": "Question deleted"}
 
 
+@user_router.delete("/{user_id}/answers")
+def delete_user_answers(user_id: int):
+    deleted_count = answer_service.delete_user_answers(user_id)
+    return {
+        "user_id": user_id,
+        "deleted_answers": deleted_count,
+    }
+
+
 @router.post("/{question_id}/answers", response_model=AnswerResponse)
 def create_answer(question_id: int, answer: AnswerCreate):
     try:

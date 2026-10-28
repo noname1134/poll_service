@@ -61,6 +61,8 @@ class AnswerService:
 
         return res
 
+    def delete_user_answers(self, user_id: int):
+        return self.answer_repository.delete_user_answers(user_id)
 
     def get_question_statistics(self, question_id: int):
         if self.question_repository.get_question(question_id) is None:

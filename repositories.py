@@ -171,6 +171,21 @@ class AnswerRepository:
 
         return self.get_answer(user_id, question_id)
 
+    @staticmethod
+    def delete_user_answers(user_id: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute("DELETE FROM answers WHERE user_id = %s", (user_id,))
+                deleted_count = cursor.rowcount
+                connection.commit()
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return deleted_count
 
     @staticmethod
     def get_option_counts(question_id: int):
