@@ -23,6 +23,9 @@ class QuestionService:
     def delete_question(self, question_id: int):
         return self.repository.delete_question(question_id)
 
+    def get_all_question_statistics(self):
+        return self.repository.get_all_question_statistics()
+
 
 class AnswerService:
     def __init__(self):
@@ -57,3 +60,34 @@ class AnswerService:
             raise AnswerNotFoundError("Answer not found")
 
         return res
+
+
+    def get_question_statistics(self, question_id: int):
+        if self.question_repository.get_question(question_id) is None:
+            raise QuestionNotFoundError("Question not found")
+
+        rows = self.answer_repository.get_option_counts(question_id)
+        counts = {1: 0, 2: 0, 3: 0, 4: 0}
+        for row in rows:
+            counts[row["selected_option"]] = row["total"]
+
+        return {
+            "question_id": question_id,
+            "option_counts": counts,
+            "total_answers": sum(counts.values())
+        }
+
+
+    def get_user_answers(self, user_id: int):
+        user = self.user_client.get_user(user_id)
+        if user is None:
+            raise UserNotFoundError("User not found")
+        if not user["is_registered"]:
+            raise UserNotRegisteredError("User is not registered")
+
+        answers = self.answer_repository.get_user_answers(user_id)
+        return {
+            "user_id": user_id,
+            "answers": answers,
+            "total_answers": len(answers),
+        }

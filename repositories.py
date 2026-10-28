@@ -87,6 +87,32 @@ class QuestionRepository:
 
         return self.get_question(question_id)
 
+    @staticmethod
+    def get_all_question_statistics():
+        connection = get_connection()
+        try:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("""
+                               SELECT 
+                                      q.id, q.title, q.option_1, q.option_2, q.option_3, q.option_4, 
+                                      COUNT(CASE WHEN a.selected_option = 1 THEN 1 END) AS option_1_count, 
+                                      COUNT(CASE WHEN a.selected_option = 2 THEN 1 END) AS option_2_count, 
+                                      COUNT(CASE WHEN a.selected_option = 3 THEN 1 END) AS option_3_count, 
+                                      COUNT(CASE WHEN a.selected_option = 4 THEN 1 END) AS option_4_count, 
+                                      COUNT(a.user_id) AS total_answers 
+                               FROM questions AS q
+                               LEFT JOIN answers AS a ON a.question_id = q.id 
+                               GROUP BY q.id, q.title, q.option_1, q.option_2, q.option_3, q.option_4 
+                               ORDER BY q.id""")
+                result = cursor.fetchall()
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return result
+
 
 class AnswerRepository:
     @staticmethod
@@ -144,3 +170,35 @@ class AnswerRepository:
             connection.close()
 
         return self.get_answer(user_id, question_id)
+
+
+    @staticmethod
+    def get_option_counts(question_id: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("SELECT selected_option, COUNT(*) as total From answers WHERE question_id = %s GROUP BY selected_option", (question_id,))
+                result = cursor.fetchall()
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return result
+
+    @staticmethod
+    def get_user_answers(user_id: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute(
+                    "SELECT * From answers WHERE user_id = %s ORDER BY question_id", (user_id,))
+                result = cursor.fetchall()
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return result

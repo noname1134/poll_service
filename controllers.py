@@ -1,13 +1,19 @@
 from fastapi import APIRouter, HTTPException
 
 from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerAlreadyExistsError, UserServiceUnavailableError, AnswerNotFoundError
-from schemas import QuestionCreate, QuestionUpdate, QuestionResponse, AnswerCreate, AnswerUpdate, AnswerResponse
+from schemas import QuestionCreate, QuestionUpdate, QuestionResponse, AnswerCreate, AnswerUpdate, AnswerResponse, QuestionStatisticsResponse, UserAnswersResponse, QuestionStatisticsItem
 from services import QuestionService, AnswerService
 
 
 router = APIRouter(prefix="/questions")
+user_router = APIRouter(prefix="/users")
 question_service = QuestionService()
 answer_service = AnswerService()
+
+
+@router.get("/statistics", response_model=list[QuestionStatisticsItem])
+def get_all_question_statistics():
+    return question_service.get_all_question_statistics()
 
 
 @router.get("/{question_id}", response_model=QuestionResponse)
@@ -61,6 +67,26 @@ def update_answer(question_id: int, user_id: int, update: AnswerUpdate):
     try:
         return answer_service.update_answer(user_id, question_id, update)
     except (QuestionNotFoundError, UserNotFoundError, AnswerNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UserNotRegisteredError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except UserServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.get("/{question_id}/statistics", response_model=QuestionStatisticsResponse)
+def get_question_statistics(question_id: int):
+    try:
+        return answer_service.get_question_statistics(question_id)
+    except QuestionNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@user_router.get("/{user_id}/answers", response_model=UserAnswersResponse)
+def get_user_answers(user_id: int):
+    try:
+        return answer_service.get_user_answers(user_id)
+    except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except UserNotRegisteredError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
