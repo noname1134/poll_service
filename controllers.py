@@ -1,11 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
-from schemas import QuestionCreate, QuestionUpdate, QuestionResponse
-from services import QuestionService
+from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerAlreadyExistsError, UserServiceUnavailableError
+from schemas import QuestionCreate, QuestionUpdate, QuestionResponse, AnswerCreate, AnswerUpdate, AnswerResponse
+from services import QuestionService, AnswerService
 
 
 router = APIRouter(prefix="/questions")
 question_service = QuestionService()
+answer_service = AnswerService()
 
 
 @router.get("/{question_id}", response_model=QuestionResponse)
@@ -39,3 +41,16 @@ def delete_question(question_id: int):
         raise HTTPException(status_code=404, detail="Question not found")
     return {"message": "Question deleted"}
 
+
+@router.post("/{question_id}/answers", response_model=AnswerResponse)
+def create_answer(question_id: int, answer: AnswerCreate):
+    try:
+        return answer_service.create_answer(question_id, answer)
+    except (QuestionNotFoundError, UserNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except UserNotRegisteredError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except AnswerAlreadyExistsError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except UserServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))

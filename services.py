@@ -1,6 +1,7 @@
-from schemas import QuestionCreate, QuestionUpdate
-from repositories import QuestionRepository
-
+from schemas import QuestionCreate, QuestionUpdate, AnswerCreate
+from repositories import QuestionRepository, AnswerRepository
+from clients import UserClient
+from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError
 
 class QuestionService:
     def __init__(self):
@@ -20,3 +21,22 @@ class QuestionService:
 
     def delete_question(self, question_id: int):
         return self.repository.delete_question(question_id)
+
+
+class AnswerService:
+    def __init__(self):
+        self.answer_repository = AnswerRepository()
+        self.question_repository = QuestionRepository()
+        self.user_client = UserClient()
+
+    def create_answer(self, question_id: int, answer: AnswerCreate):
+        if self.question_repository.get_question(question_id) is None:
+            raise QuestionNotFoundError("Question not found")
+
+        user = self.user_client.get_user(answer.user_id)
+        if user is None:
+            raise UserNotFoundError("User not found")
+        if not user["is_registered"]:
+            raise UserNotRegisteredError("User is not registered")
+
+        return self.answer_repository.create_answer(answer.user_id, question_id, answer.selected_option)

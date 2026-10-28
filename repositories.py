@@ -1,3 +1,6 @@
+from mysql.connector import IntegrityError, errorcode
+
+from exceptions import AnswerAlreadyExistsError
 from database import get_connection
 from schemas import QuestionCreate
 
@@ -83,3 +86,46 @@ class QuestionRepository:
             connection.close()
 
         return self.get_question(question_id)
+
+
+class AnswerRepository:
+    @staticmethod
+    def get_answer(user_id: int, question_id: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor(dictionary=True)
+            try:
+                cursor.execute("SELECT * FROM answers WHERE user_id = %s AND question_id = %s", (user_id, question_id))
+                result = cursor.fetchone()
+                return result
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+
+    def create_answer(self, user_id: int, question_id: int, selected_option: int):
+        connection = get_connection()
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "INSERT INTO answers (user_id, question_id, selected_option) VALUES (%s, %s, %s)",
+                    (
+                        user_id,
+                        question_id,
+                        selected_option
+                    )
+                )
+                connection.commit()
+            except IntegrityError as exc:
+                connection.rollback()
+                if exc.errno == errorcode.ER_DUP_ENTRY:
+                    raise AnswerAlreadyExistsError("User has already answered this question") from exc
+                raise
+            finally:
+                cursor.close()
+        finally:
+            connection.close()
+
+        return self.get_answer(user_id, question_id)
