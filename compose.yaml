@@ -17,6 +17,31 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
-
+  api:
+    build: .
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      USER_SERVICE_URL: http://user-api:8000
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      default: {}
+      service_network:
+        aliases:
+          - poll-api
+    
+networks:
+  default: {}
+  service_network:
+    external: true
+    name: poll-system
+          
 volumes:
   polls_mysql_data:
