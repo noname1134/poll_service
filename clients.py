@@ -14,7 +14,10 @@ class UserClient:
 
     def get_user(self, user_id: int):
         try:
-            response = httpx.get(f"{self.base_url}/users/{user_id}",timeout=5.0,)
+            response = httpx.get(
+                f"{self.base_url}/users/{user_id}",
+                timeout=5.0,
+            )
 
             if response.status_code == 404:
                 return None
@@ -24,4 +27,6 @@ class UserClient:
         except httpx.RequestError as exc:
             raise UserServiceUnavailableError("Could not reach the User service") from exc
         except httpx.HTTPStatusError as exc:
-            raise UserServiceUnavailableError("User service returned an unexpected HTTP status") from exc
+            raise UserServiceUnavailableError(
+                "User service returned an unexpected HTTP status"
+            ) from exc

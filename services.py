@@ -1,7 +1,12 @@
-from schemas import QuestionCreate, QuestionUpdate, AnswerCreate, AnswerUpdate
-from repositories import QuestionRepository, AnswerRepository
 from clients import UserClient
-from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerNotFoundError
+from exceptions import (
+    AnswerNotFoundError,
+    QuestionNotFoundError,
+    UserNotFoundError,
+    UserNotRegisteredError,
+)
+from repositories import AnswerRepository, QuestionRepository
+from schemas import AnswerCreate, AnswerUpdate, QuestionCreate, QuestionUpdate
 
 
 class QuestionService:
@@ -43,8 +48,9 @@ class AnswerService:
         if not user["is_registered"]:
             raise UserNotRegisteredError("User is not registered")
 
-        return self.answer_repository.create_answer(answer.user_id, question_id, answer.selected_option)
-
+        return self.answer_repository.create_answer(
+            answer.user_id, question_id, answer.selected_option
+        )
 
     def update_answer(self, user_id: int, question_id: int, update: AnswerUpdate):
         if self.question_repository.get_question(question_id) is None:
@@ -76,9 +82,8 @@ class AnswerService:
         return {
             "question_id": question_id,
             "option_counts": counts,
-            "total_answers": sum(counts.values())
+            "total_answers": sum(counts.values()),
         }
-
 
     def get_user_answers(self, user_id: int):
         user = self.user_client.get_user(user_id)

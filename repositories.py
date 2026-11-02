@@ -1,7 +1,7 @@
 from mysql.connector import IntegrityError, errorcode
 
-from exceptions import AnswerAlreadyExistsError
 from database import get_connection
+from exceptions import AnswerAlreadyExistsError
 from schemas import QuestionCreate
 
 
@@ -37,20 +37,20 @@ class QuestionRepository:
             return None
         return True
 
-
     def create_question(self, question: QuestionCreate):
         connection = get_connection()
         try:
             cursor = connection.cursor()
             try:
-                cursor.execute("INSERT INTO questions (title, option_1, option_2, option_3, option_4) VALUES (%s, %s, %s, %s, %s)",
+                cursor.execute(
+                    "INSERT INTO questions (title, option_1, option_2, option_3, option_4) VALUES (%s, %s, %s, %s, %s)",
                     (
                         question.title,
                         question.option_1,
                         question.option_2,
                         question.option_3,
-                        question.option_4
-                    )
+                        question.option_4,
+                    ),
                 )
                 connection.commit()
                 question_id = cursor.lastrowid
@@ -60,7 +60,6 @@ class QuestionRepository:
             connection.close()
 
         return self.get_question(question_id)
-
 
     def update_question(self, question_id: int, changes: dict):
         allowed_fields = {"title", "option_1", "option_2", "option_3", "option_4"}
@@ -121,14 +120,16 @@ class AnswerRepository:
         try:
             cursor = connection.cursor(dictionary=True)
             try:
-                cursor.execute("SELECT * FROM answers WHERE user_id = %s AND question_id = %s", (user_id, question_id))
+                cursor.execute(
+                    "SELECT * FROM answers WHERE user_id = %s AND question_id = %s",
+                    (user_id, question_id),
+                )
                 result = cursor.fetchone()
                 return result
             finally:
                 cursor.close()
         finally:
             connection.close()
-
 
     def create_answer(self, user_id: int, question_id: int, selected_option: int):
         connection = get_connection()
@@ -137,17 +138,15 @@ class AnswerRepository:
             try:
                 cursor.execute(
                     "INSERT INTO answers (user_id, question_id, selected_option) VALUES (%s, %s, %s)",
-                    (
-                        user_id,
-                        question_id,
-                        selected_option
-                    )
+                    (user_id, question_id, selected_option),
                 )
                 connection.commit()
             except IntegrityError as exc:
                 connection.rollback()
                 if exc.errno == errorcode.ER_DUP_ENTRY:
-                    raise AnswerAlreadyExistsError("User has already answered this question") from exc
+                    raise AnswerAlreadyExistsError(
+                        "User has already answered this question"
+                    ) from exc
                 raise
             finally:
                 cursor.close()
@@ -156,13 +155,15 @@ class AnswerRepository:
 
         return self.get_answer(user_id, question_id)
 
-
     def update_answer(self, user_id: int, question_id: int, selected_option: int):
         connection = get_connection()
         try:
             cursor = connection.cursor()
             try:
-                cursor.execute("UPDATE answers SET selected_option = %s WHERE user_id = %s and question_id = %s", (selected_option, user_id, question_id))
+                cursor.execute(
+                    "UPDATE answers SET selected_option = %s WHERE user_id = %s and question_id = %s",
+                    (selected_option, user_id, question_id),
+                )
                 connection.commit()
             finally:
                 cursor.close()
@@ -193,7 +194,10 @@ class AnswerRepository:
         try:
             cursor = connection.cursor(dictionary=True)
             try:
-                cursor.execute("SELECT selected_option, COUNT(*) as total From answers WHERE question_id = %s GROUP BY selected_option", (question_id,))
+                cursor.execute(
+                    "SELECT selected_option, COUNT(*) as total From answers WHERE question_id = %s GROUP BY selected_option",
+                    (question_id,),
+                )
                 result = cursor.fetchall()
             finally:
                 cursor.close()
@@ -209,7 +213,8 @@ class AnswerRepository:
             cursor = connection.cursor(dictionary=True)
             try:
                 cursor.execute(
-                    "SELECT * From answers WHERE user_id = %s ORDER BY question_id", (user_id,))
+                    "SELECT * From answers WHERE user_id = %s ORDER BY question_id", (user_id,)
+                )
                 result = cursor.fetchall()
             finally:
                 cursor.close()

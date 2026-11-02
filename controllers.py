@@ -1,9 +1,25 @@
 from fastapi import APIRouter, HTTPException
 
-from exceptions import QuestionNotFoundError, UserNotFoundError, UserNotRegisteredError, AnswerAlreadyExistsError, UserServiceUnavailableError, AnswerNotFoundError
-from schemas import QuestionCreate, QuestionUpdate, QuestionResponse, AnswerCreate, AnswerUpdate, AnswerResponse, QuestionStatisticsResponse, UserAnswersResponse, QuestionStatisticsItem
-from services import QuestionService, AnswerService
-
+from exceptions import (
+    AnswerAlreadyExistsError,
+    AnswerNotFoundError,
+    QuestionNotFoundError,
+    UserNotFoundError,
+    UserNotRegisteredError,
+    UserServiceUnavailableError,
+)
+from schemas import (
+    AnswerCreate,
+    AnswerResponse,
+    AnswerUpdate,
+    QuestionCreate,
+    QuestionResponse,
+    QuestionStatisticsItem,
+    QuestionStatisticsResponse,
+    QuestionUpdate,
+    UserAnswersResponse,
+)
+from services import AnswerService, QuestionService
 
 router = APIRouter(prefix="/questions")
 user_router = APIRouter(prefix="/users")
@@ -71,7 +87,7 @@ def create_answer(question_id: int, answer: AnswerCreate):
         raise HTTPException(status_code=503, detail=str(exc))
 
 
-@router.patch("/{question_id}/answers/{user_id}",response_model=AnswerResponse)
+@router.patch("/{question_id}/answers/{user_id}", response_model=AnswerResponse)
 def update_answer(question_id: int, user_id: int, update: AnswerUpdate):
     try:
         return answer_service.update_answer(user_id, question_id, update)

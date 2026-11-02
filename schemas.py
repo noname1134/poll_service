@@ -8,6 +8,7 @@ class QuestionCreate(BaseModel):
     option_3: str = Field(min_length=1)
     option_4: str = Field(min_length=1)
 
+
 class QuestionUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     option_1: str | None = Field(default=None, min_length=1)
