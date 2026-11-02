@@ -1,8 +1,14 @@
 # Poll Service
 
+[![Python CI](https://github.com/noname1134/poll_service/actions/workflows/ci.yml/badge.svg)](https://github.com/noname1134/poll_service/actions/workflows/ci.yml)
+
 A REST API for managing multiple-choice questions, collecting answers from registered users, and retrieving voting statistics.
 
-Built with **Python, FastAPI, and MySQL**, with **Docker Compose** for local deployment.
+Built with **Python, FastAPI, and MySQL**, with **Docker Compose** for local deployment and **GitHub Actions** for automated testing.
+
+Part of a two-service polling system alongside [User Service](https://github.com/noname1134/user_service). Each service owns its database and communicates over HTTP.
+
+[Getting Started](#getting-started) · [API Reference](#api-reference) · [Example Workflow](#example-workflow) · [Testing](#testing)
 
 ## Features
 
@@ -14,7 +20,8 @@ Built with **Python, FastAPI, and MySQL**, with **Docker Compose** for local dep
 - Retrieve or delete a user's answers.
 - Retrieve voting statistics for individual questions or all questions.
 - Validate requests with Pydantic and database constraints.
-- Explore endpoints through interactive API documentation.
+- Explore endpoints through interactive Swagger documentation.
+- Verify voting behavior and database constraints with API and MySQL integration tests.
 
 ## Technology Stack
 
@@ -26,8 +33,11 @@ Built with **Python, FastAPI, and MySQL**, with **Docker Compose** for local dep
 | Database | MySQL 8.4 |
 | Database driver | MySQL Connector/Python |
 | HTTP client | HTTPX |
-| Configuration | Environment variables |
+| Configuration | Environment variables and python-dotenv |
 | Containers | Docker and Docker Compose |
+| Testing | pytest and FastAPI TestClient |
+| Code quality | Ruff |
+| CI | GitHub Actions |
 
 ## Architecture
 
@@ -44,7 +54,11 @@ The application separates HTTP handling, business logic, and database access.
 | `database.py` | MySQL connection configuration |
 | `exceptions.py` | Application-specific exceptions |
 | `sql/001_create_poll_tables.sql` | Initial database schema |
-| `compose.yaml` | Container and network configuration |
+| `compose.yaml` | Application containers and shared service network |
+| `compose.test.yaml` | Disposable MySQL integration-test database |
+| `tests/test_answers.py` | API voting behavior tests |
+| `tests/integration/` | Real MySQL constraint and cascade tests |
+| `.github/workflows/ci.yml` | Automated lint, formatting, and test checks |
 
 Before accepting or updating an answer, the service checks that the question exists and verifies the user's registration through the User Service.
 
@@ -76,7 +90,7 @@ Each answer contains:
 ### Prerequisites
 
 - Docker with Docker Compose.
-- A compatible User Service.
+- [User Service](https://github.com/noname1134/user_service) for submitting, updating, and retrieving user answers.
 - Available local ports `8001` and `3308`.
 
 ### 1. Clone the repository
@@ -110,13 +124,13 @@ Docker Compose configures the API to connect to MySQL at `db:3306` and the User 
 
 ### 3. Prepare the shared network
 
-Create the network if it does not already exist:
+Both repositories use the external network `poll-system`. Create it once if it does not already exist:
 
 ```bash
 docker network create poll-system
 ```
 
-The User Service must join this network with the alias `user-api` and listen on container port `8000`.
+Start User Service using its own README instructions. It must join this network with the alias `user-api` and listen on container port `8000`.
 
 The Poll Service expects the following endpoint:
 
@@ -124,7 +138,7 @@ The Poll Service expects the following endpoint:
 GET http://user-api:8000/users/{user_id}
 ```
 
-A successful response must include an `is_registered` boolean. A missing user should return HTTP `404`.
+A successful response must include an `is_registered` boolean. A missing user should return HTTP `404`. User Service calls this service at `http://poll-api:8000` to remove answers before deleting a user profile.
 
 ### 4. Start the services
 
@@ -255,6 +269,16 @@ For a question with only the answer above:
 }
 ```
 
+### Update an answer
+
+Use `PATCH` to change a previous vote; submitting another `POST` for the same user and question returns `409`.
+
+```bash
+curl -X PATCH http://localhost:8001/questions/1/answers/1 \
+  -H "Content-Type: application/json" \
+  -d '{"selected_option": 2}'
+```
+
 ## Error Handling
 
 | HTTP Status | Example |
@@ -264,3 +288,94 @@ For a question with only the answer above:
 | `409 Conflict` | User has already answered the question |
 | `422 Unprocessable Entity` | Invalid request data |
 | `503 Service Unavailable` | User Service is unreachable or returns an unexpected HTTP status |
+
+## Testing
+
+Run commands from the repository root using Python 3.10 or newer.
+
+### Install development dependencies
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+```
+
+### API tests
+
+```bash
+python -m pytest tests/test_answers.py -v
+```
+
+These three tests exercise real routes and service logic while mocking database access and User Service calls:
+
+- A registered user can submit an answer.
+- An unregistered user receives `403`, without an answer being written.
+- A duplicate-answer repository error is returned as HTTP `409`.
+
+No running MySQL database or User Service is required for this suite. The duplicate API test checks error handling; the integration test below verifies actual database enforcement.
+
+### MySQL integration tests
+
+Start a temporary MySQL 8.4 database and enable the integration tests:
+
+```bash
+docker compose -p poll-integration -f compose.test.yaml up -d --wait --wait-timeout 180
+RUN_MYSQL_TESTS=1 python -m pytest tests/integration/ -v
+```
+
+These two tests use real repository queries to verify:
+
+- Duplicate votes raise `AnswerAlreadyExistsError`, preserve the original answer, and leave exactly one vote.
+- Deleting a question cascades to its answers while preserving another question and its answers.
+
+The test database uses port `3309`, dedicated test credentials, and temporary storage. It initializes from `sql/` and does not use the application's database credentials. Each test removes its own records during cleanup.
+
+Stop the test database afterward:
+
+```bash
+docker compose -p poll-integration -f compose.test.yaml down
+```
+
+Stopping the container discards the temporary database. On Linux, prefix Docker commands with `sudo` if your user lacks access to the Docker socket; run Python commands from the activated virtual environment without `sudo`.
+
+To run all five test cases with the test database running:
+
+```bash
+RUN_MYSQL_TESTS=1 python -m pytest tests/ -v
+```
+
+Without `RUN_MYSQL_TESTS=1`, the two database tests are skipped.
+
+### Lint and formatting
+
+```bash
+ruff check .
+ruff format --check .
+```
+
+Apply formatting locally with `ruff format .`.
+
+## Continuous Integration
+
+[Python CI](https://github.com/noname1134/poll_service/actions/workflows/ci.yml) runs on every push and pull request using Python 3.10.
+
+| Job | Checks |
+| :--- | :--- |
+| `checks` | Ruff lint, formatting, and the three API tests; integration tests are skipped |
+| `mysql-integration` | Starts MySQL 8.4 and runs the two database integration tests |
+
+The integration job stops the test database even when tests fail.
+
+## Current Limitations
+
+- Authentication and authorization are not implemented. Checking a supplied user's registration does not authenticate the caller.
+- Question options are fixed at four per question.
+- Cross-service user checks and answer writes are separate operations; concurrent user deletion is not coordinated by a distributed transaction.
+- SQL initialization scripts run for a new database volume; schema migrations are not implemented.
+- The health endpoint checks API availability rather than database or dependency readiness.
+- Automated coverage focuses on voting rules and database constraints; it does not cover every endpoint or a complete two-service deployment.
+
+## Author
+
+[Liad Illouz](https://www.linkedin.com/in/liad-illouz)
