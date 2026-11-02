@@ -2,79 +2,81 @@
 
 A REST API for managing multiple-choice questions, collecting answers from registered users, and retrieving voting statistics.
 
-Built with **Python, FastAPI, and MySQL**, the service uses a layered architecture and communicates with a separate User Service over HTTP. Docker Compose manages the API and its database.
+Built with **Python, FastAPI, and MySQL**, with **Docker Compose** for local deployment.
 
 ## Features
 
-- Create, retrieve, update, and delete questions with four answer options.
-- Verify user existence and registration through the User Service.
+- Create, retrieve, update, and delete questions.
+- Support four answer options per question.
+- Verify user registration through a separate User Service.
 - Enforce one answer per user per question.
-- Update previously submitted answers.
-- Retrieve a user's answers or delete all their answers.
+- Update existing answers.
+- Retrieve or delete a user's answers.
 - Retrieve voting statistics for individual questions or all questions.
-- Validate request data with Pydantic and database constraints.
-- Explore the API through interactive Swagger documentation.
+- Validate requests with Pydantic and database constraints.
+- Explore endpoints through interactive API documentation.
 
 ## Technology Stack
 
 | Component | Technology |
-|---|---|
+| :--- | :--- |
 | Language | Python |
 | API framework | FastAPI |
 | Validation | Pydantic |
 | Database | MySQL 8.4 |
 | Database driver | MySQL Connector/Python |
 | HTTP client | HTTPX |
-| Configuration | Environment variables and python-dotenv |
+| Configuration | Environment variables |
 | Containers | Docker and Docker Compose |
 
 ## Architecture
 
-The application separates HTTP handling, business rules, and database access:
+The application separates HTTP handling, business logic, and database access.
 
 | File | Responsibility |
-|---|---|
+| :--- | :--- |
 | `main.py` | Application initialization and health endpoint |
 | `controllers.py` | API routes and HTTP error responses |
 | `services.py` | Business rules and service coordination |
 | `repositories.py` | SQL queries and persistence |
-| `schemas.py` | Request and response models |
-| `clients.py` | HTTP communication with the User Service |
+| `schemas.py` | Request and response validation |
+| `clients.py` | Communication with the User Service |
 | `database.py` | MySQL connection configuration |
 | `exceptions.py` | Application-specific exceptions |
 | `sql/001_create_poll_tables.sql` | Initial database schema |
-| `compose.yaml` | API, database, and network configuration |
+| `compose.yaml` | Container and network configuration |
 
-Before accepting or updating an answer, the Poll Service checks that the question exists and asks the User Service whether the user exists and is registered.
+Before accepting or updating an answer, the service checks that the question exists and verifies the user's registration through the User Service.
 
-## Data Model
+## Database Design
 
 ### Questions
 
-Each question contains:
-
-- An automatically generated ID.
-- A title.
-- Four answer options: `option_1` through `option_4`.
+Each question contains an automatically generated ID, a title, and four answer options.
 
 ### Answers
 
 Each answer contains:
 
-- `user_id`
-- `question_id`
-- `selected_option`, from `1` to `4`
+| Field | Description |
+| :--- | :--- |
+| `user_id` | ID of the user submitting the answer |
+| `question_id` | ID of the question being answered |
+| `selected_option` | Selected option, between `1` and `4` |
 
-The composite primary key `(user_id, question_id)` prevents duplicate answers for the same user and question.
+**Design decisions:**
 
-A foreign key links answers to questions with `ON DELETE CASCADE`, so deleting a question also deletes its answers. User existence is checked through the User Service rather than a database foreign key.
+- A composite primary key on `(user_id, question_id)` prevents duplicate answers.
+- A database `CHECK` constraint restricts selected options to `1–4`.
+- `ON DELETE CASCADE` removes answers when their question is deleted.
+- User existence is verified through the User Service rather than a cross-service database foreign key.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Docker with Docker Compose.
-- A running, compatible User Service.
+- A compatible User Service.
 - Available local ports `8001` and `3308`.
 
 ### 1. Clone the repository
@@ -93,53 +95,55 @@ cp .env.example .env
 Replace the example database passwords in `.env`.
 
 | Variable | Purpose |
-|---|---|
+| :--- | :--- |
 | `MYSQL_DATABASE` | Database name |
 | `MYSQL_USER` | Application database user |
 | `MYSQL_PASSWORD` | Application database password |
 | `MYSQL_ROOT_PASSWORD` | MySQL root password |
-| `MYSQL_HOST` | Database host for running Python locally |
-| `MYSQL_PORT` | Database port for running Python locally |
-| `USER_SERVICE_URL` | User Service URL for running Python locally |
+| `MYSQL_HOST` | Database host when running Python locally |
+| `MYSQL_PORT` | Database port when running Python locally |
+| `USER_SERVICE_URL` | User Service URL when running Python locally |
 
-Docker Compose overrides the API's database host and port with `db:3306` and sets the User Service URL to `http://user-api:8000`.
+Docker Compose configures the API to connect to MySQL at `db:3306` and the User Service at `http://user-api:8000`.
 
-Keep real credentials in `.env`; commit only placeholder values in `.env.example`.
+> Keep real credentials in `.env`. The committed `.env.example` contains placeholders.
 
 ### 3. Prepare the shared network
 
-Create the external network if it does not already exist:
+Create the network if it does not already exist:
 
 ```bash
 docker network create poll-system
 ```
 
-The User Service API must join this network with the alias `user-api` and listen on port `8000` inside its container.
+The User Service must join this network with the alias `user-api` and listen on container port `8000`.
 
-The Poll Service expects:
+The Poll Service expects the following endpoint:
 
-```text
+```http
 GET http://user-api:8000/users/{user_id}
 ```
 
 A successful response must include an `is_registered` boolean. A missing user should return HTTP `404`.
 
-### 4. Start the application
+### 4. Start the services
 
 ```bash
 docker compose up --build -d
 ```
 
-MySQL initializes the tables automatically when its data volume is first created.
+MySQL initializes the tables when its database volume is first created.
+
+### 5. Explore the API
 
 | Resource | URL |
-|---|---|
+| :--- | :--- |
 | Swagger UI | http://localhost:8001/docs |
 | ReDoc | http://localhost:8001/redoc |
 | OpenAPI schema | http://localhost:8001/openapi.json |
 | Health endpoint | http://localhost:8001/health |
 
-### 5. Check the API
+Check that the API is running:
 
 ```bash
 curl http://localhost:8001/health
@@ -148,40 +152,56 @@ curl http://localhost:8001/health
 Expected response:
 
 ```json
-{"status":"ok"}
+{
+  "status": "ok"
+}
 ```
 
-This endpoint confirms that the API is running; it does not check database or User Service connectivity.
+> The health endpoint checks API availability. It does not check database or User Service connectivity.
 
-To view logs:
+### Useful commands
+
+View API logs:
 
 ```bash
 docker compose logs -f api
 ```
 
-To stop the services:
+Stop the services:
 
 ```bash
 docker compose down
 ```
 
-The database volume persists after shutdown. SQL initialization scripts do not reapply automatically to an existing database volume.
+The database volume persists after shutdown. Initialization scripts do not automatically reapply to an existing database volume.
 
-## API Endpoints
+## API Reference
+
+### Questions
 
 | Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Check API availability |
+| :--- | :--- | :--- |
 | `POST` | `/questions` | Create a question |
 | `GET` | `/questions/{question_id}` | Retrieve a question |
-| `PATCH` | `/questions/{question_id}` | Partially update a question |
+| `PATCH` | `/questions/{question_id}` | Update question fields |
 | `DELETE` | `/questions/{question_id}` | Delete a question and its answers |
+
+### Answers
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
 | `POST` | `/questions/{question_id}/answers` | Submit an answer |
 | `PATCH` | `/questions/{question_id}/answers/{user_id}` | Update an answer |
-| `GET` | `/questions/{question_id}/statistics` | Retrieve statistics for one question |
-| `GET` | `/questions/statistics` | Retrieve statistics for all questions |
 | `GET` | `/users/{user_id}/answers` | Retrieve a user's answers |
 | `DELETE` | `/users/{user_id}/answers` | Delete all answers belonging to a user |
+
+### Statistics and Health
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/questions/{question_id}/statistics` | Statistics for one question |
+| `GET` | `/questions/statistics` | Statistics for all questions |
+| `GET` | `/health` | Check API availability |
 
 ## Example Workflow
 
@@ -201,7 +221,9 @@ curl -X POST http://localhost:8001/questions \
 
 ### Submit an answer
 
-Use the question ID returned above and the ID of a registered user in the User Service. This example assumes both IDs are `1`.
+Use the question ID returned above and the ID of a registered user in the User Service.
+
+This example assumes both IDs are `1`:
 
 ```bash
 curl -X POST http://localhost:8001/questions/1/answers \
@@ -235,22 +257,10 @@ For a question with only the answer above:
 
 ## Error Handling
 
-| Status | Example |
-|---|---|
+| HTTP Status | Example |
+| :--- | :--- |
 | `403 Forbidden` | User exists but is not registered |
 | `404 Not Found` | Requested question, user, or answer does not exist |
 | `409 Conflict` | User has already answered the question |
-| `422 Unprocessable Entity` | Invalid input, such as an option outside `1–4` |
-| `503 Service Unavailable` | User Service cannot be reached or returns an unexpected HTTP status |
-
-## Current Scope and Planned Improvements
-
-The project implements the core polling workflow. Authentication and authorization are not currently implemented; registration checks validate user eligibility but do not authenticate the caller.
-
-Planned improvements include:
-
-- Automated tests for business rules, API responses, and database behavior.
-- GitHub Actions for tests and linting.
-- Dependency injection for repositories and HTTP clients.
-- Database migrations for schema changes.
-- Authentication and authorization for protected operations.
+| `422 Unprocessable Entity` | Invalid request data |
+| `503 Service Unavailable` | User Service is unreachable or returns an unexpected HTTP status |
